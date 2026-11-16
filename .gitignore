@@ -44,3 +44,8 @@ example
 
 # Windows
 desktop.ini
+
+# env
+.env
+.env.local
+.env*.local
