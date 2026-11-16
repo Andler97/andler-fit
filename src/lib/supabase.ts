@@ -12,11 +12,29 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
+// Expo web SSR renders in Node, where AsyncStorage touches `window` and crashes.
+const storage = {
+  getItem: (key: string) => {
+    if (typeof window === 'undefined') return Promise.resolve(null);
+    return AsyncStorage.getItem(key);
+  },
+  setItem: (key: string, value: string) => {
+    if (typeof window === 'undefined') return Promise.resolve();
+    return AsyncStorage.setItem(key, value);
+  },
+  removeItem: (key: string) => {
+    if (typeof window === 'undefined') return Promise.resolve();
+    return AsyncStorage.removeItem(key);
+  },
+};
+
+const isBrowser = typeof window !== 'undefined';
+
 export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '', {
   auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
+    storage,
+    autoRefreshToken: isBrowser,
+    persistSession: isBrowser,
     detectSessionInUrl: false,
   },
 });
