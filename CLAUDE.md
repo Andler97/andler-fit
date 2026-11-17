@@ -14,12 +14,19 @@ Mobile-first: **React Native + Expo** (not web-first; web is only used for quick
 - Path alias: `@/*` -> `src/*`.
 
 ## Run it
-Native modules (camera, notifications, Apple auth) require a **dev build** — Expo Go will not work.
+The target is a **dev build** (`expo-dev-client`). Expo Go also runs the MVP (camera, local
+notifications and Google sign-in all work there), which is the iPhone path until there's a paid
+Apple Developer account. Apple sign-in does not work in Expo Go.
 ```
 npm install
-npx expo run:ios      # or run:android, or an EAS dev build
-npx expo start --web  # quick loop for auth/onboarding/tracker UI only (no camera on web)
+npx eas-cli build --profile development --platform android   # EAS dev build (APK); iOS needs Apple Dev account
+npx expo start --dev-client   # serve JS to the dev build
+npx expo start --go           # serve JS to Expo Go (iPhone without a dev build)
+npx expo start --web          # quick loop for auth/onboarding/tracker UI only (no camera on web)
 ```
+Windows dev box: no Android SDK/JDK 17 locally, so native builds go through EAS (project
+`@andler97/andlerfit`). The phone must reach Metro on the LAN; if Windows Firewall blocks Node,
+allow it or use `--tunnel` (needs `@expo/ngrok`).
 `.env` holds `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` (gitignored).
 
 ## Before you finish any change
@@ -30,8 +37,14 @@ npx expo start --web  # quick loop for auth/onboarding/tracker UI only (no camer
 - **Never `await` a Supabase data query inside `onAuthStateChange`.** It holds an auth lock and deadlocks on web. Track the session in the callback; load the profile in a separate effect keyed on the user id. (See `src/providers/auth.tsx`.)
 - `flowType: 'pkce'` is required (OAuth returns `?code=`, exchanged via `exchangeCodeForSession`).
 - Web uses a full-page redirect (`redirectTo: window.location.origin`); native uses `WebBrowser.openAuthSessionAsync` + manual code exchange. App scheme is `andlerfit`.
+- Native redirect is the fixed string `andlerfit://`. **Don't use `makeRedirectUri`/`Linking.createURL` for it** in dev builds: they embed the Metro host (`andlerfit://192.168.x.x:8081`), which isn't allow-listed, so Supabase silently falls back to the Site URL. Only Expo Go uses `Linking.createURL('/')` (`exp://<host>/--/`).
+- Supabase falls back to the Site URL *silently* when `redirect_to` isn't allow-listed. To check a redirect, start `/auth/v1/authorize?provider=google&redirect_to=...&code_challenge=<marker>` and read `referrer` from `auth.flow_state` for that challenge. Allow-list edits take ~1–2 min to propagate.
 - Apple Sign-In is wired but **deferred** (needs a paid Apple Developer account). Keep it iOS-only and non-blocking.
-- Supabase Auth config needed for sign-in to work: Google provider keys + redirect allow-list (`andlerfit://`, and `http://localhost:8081` for web dev).
+- Supabase Auth config needed for sign-in to work: Google provider keys + redirect allow-list (`andlerfit://`, `exp://**` for Expo Go, and `http://localhost:8081` for web dev).
+
+## Native gotchas
+- Android 13+ shows the notification permission prompt only after a channel exists: create the `fasting` channel before `requestPermissionsAsync` and schedule on it (`src/lib/notifications.ts`).
+- `CameraView.onBarcodeScanned` fires many times per second; gate it with a ref, not state (`src/app/scan.tsx`).
 
 ## Database
 - Migrations: `supabase/migrations/` (`0001_init_mvp`, `0002_harden_functions`). Apply in order (Supabase CLI `supabase db push`, or the MCP migration tool).
