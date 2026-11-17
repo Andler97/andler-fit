@@ -6,7 +6,6 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  // Surfaced in dev so a missing .env is obvious instead of silently failing.
   console.warn(
     '[supabase] Missing env. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env',
   );
@@ -35,6 +34,9 @@ export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '', {
     storage,
     autoRefreshToken: isBrowser,
     persistSession: isBrowser,
+    // We finish the OAuth redirect ourselves (see providers/auth), so keep this off.
     detectSessionInUrl: false,
+    // PKCE is required for exchangeCodeForSession and returns `?code=` on redirect.
+    flowType: 'pkce',
   },
 });

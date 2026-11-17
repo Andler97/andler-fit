@@ -1,3 +1,9 @@
+import { supabase } from '@/lib/supabase';
+import type { Profile } from '@/types/db';
+import type { Session } from '@supabase/supabase-js';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
 import {
   createContext,
   useCallback,
@@ -6,14 +12,10 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import * as AppleAuthentication from 'expo-apple-authentication';
-import * as AuthSession from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
-import type { Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
-import type { Profile } from '@/types/db';
 
 WebBrowser.maybeCompleteAuthSession();
+
+const isWeb = typeof window !== 'undefined' && typeof document !== 'undefined';
 
 interface AuthContextValue {
   session: Session | null;
@@ -27,42 +29,69 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+async function fetchProfile(userId: string): Promise<Profile | null> {
+  const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+  return (data as Profile) ?? null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-    setProfile((data as Profile) ?? null);
-  }, []);
-
-  const refreshProfile = useCallback(async () => {
-    if (session?.user) await loadProfile(session.user.id);
-  }, [session, loadProfile]);
-
+  // Bootstrap session + subscribe to changes.
+  // IMPORTANT: never await a Supabase data call inside onAuthStateChange — the auth
+  // lock it holds will deadlock the query (and the UI) on web. Track the session only
+  // here; the profile loads in the separate effect below, outside that lock.
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getSession().then(async ({ data }) => {
+    (async () => {
+      try {
+        if (isWeb && window.location.search.includes('code=')) {
+          const code = new URLSearchParams(window.location.search).get('code');
+          if (code) {
+            await supabase.auth.exchangeCodeForSession(code);
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        }
+      } catch (e) {
+        console.warn('[auth] OAuth code exchange failed', e);
+      }
+      const { data } = await supabase.auth.getSession();
       if (!mounted) return;
       setSession(data.session);
-      if (data.session?.user) await loadProfile(data.session.user.id);
       setLoading(false);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
-      if (newSession?.user) await loadProfile(newSession.user.id);
-      else setProfile(null);
     });
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, [loadProfile]);
+  }, []);
+
+  // Load the profile whenever the signed-in user changes.
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) {
+      setProfile(null);
+      return;
+    }
+    let active = true;
+    fetchProfile(userId).then((p) => {
+      if (active) setProfile(p);
+    });
+    return () => {
+      active = false;
+    };
+  }, [session?.user?.id]);
+
+  const refreshProfile = useCallback(async () => {
+    const userId = session?.user?.id;
+    if (userId) setProfile(await fetchProfile(userId));
+  }, [session?.user?.id]);
 
   const signInWithApple = useCallback(async () => {
     const credential = await AppleAuthentication.signInAsync({
@@ -80,6 +109,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
+    // Web: full-page redirect; the bootstrap effect above exchanges the `?code=`.
+    if (isWeb) {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      });
+      if (error) throw error;
+      return;
+    }
+
+    // Native: open an in-app browser and exchange the code we get back.
     const redirectTo = AuthSession.makeRedirectUri({ scheme: 'andlerfit' });
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -89,8 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!data.url) throw new Error('No OAuth URL returned');
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
     if (result.type !== 'success') return;
-    const url = new URL(result.url);
-    const code = url.searchParams.get('code');
+    const code = new URL(result.url).searchParams.get('code');
     if (code) {
       const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
       if (exchangeError) throw exchangeError;
