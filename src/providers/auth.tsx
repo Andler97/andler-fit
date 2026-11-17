@@ -2,6 +2,8 @@ import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/types/db';
 import type { Session } from '@supabase/supabase-js';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+import * as ExpoLinking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import {
   createContext,
@@ -17,11 +19,14 @@ WebBrowser.maybeCompleteAuthSession();
 
 const isWeb = Platform.OS === 'web';
 
-// Must match the Supabase redirect allow-list exactly. Don't derive it with
-// AuthSession.makeRedirectUri / Linking.createURL: in a dev build those embed the Metro host
-// (`andlerfit://192.168.x.x:8081`), which isn't allow-listed, so Supabase silently falls back
-// to the Site URL and the phone's browser never returns to the app.
-const NATIVE_REDIRECT = 'andlerfit://';
+// Must match the Supabase redirect allow-list. In dev/standalone builds use the bare scheme;
+// don't derive it with AuthSession.makeRedirectUri / Linking.createURL there: they embed the
+// Metro host (`andlerfit://192.168.x.x:8081`), which isn't allow-listed, so Supabase silently
+// falls back to the Site URL and the phone's browser never returns to the app.
+// Expo Go can't receive `andlerfit://` (it isn't the app), so there we return to the
+// project's own `exp://<host>/--/` URL, which needs `exp://**` in the allow-list.
+const inExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+const NATIVE_REDIRECT = inExpoGo ? ExpoLinking.createURL('/') : 'andlerfit://';
 
 function redirectParams(url: string): URLSearchParams {
   const params = new URLSearchParams();
