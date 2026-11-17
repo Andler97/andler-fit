@@ -4,6 +4,8 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/providers/auth';
 import { colors } from '@/lib/theme';
+// Registers the foreground notification handler at startup.
+import '@/lib/notifications';
 
 function InitialLayout() {
   const { session, profile, loading } = useAuth();

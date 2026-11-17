@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { Button, Card, Screen } from '@/components/kit';
@@ -17,16 +17,24 @@ export default function Scan() {
   const [food, setFood] = useState<OffFood | null>(null);
   const [grams, setGrams] = useState('100');
   const [loading, setLoading] = useState(false);
+  // The native scanner fires many callbacks per second while a code is in view; a ref
+  // closes the gate synchronously, before the state update re-renders the camera.
+  const locked = useRef(false);
+  const resume = () => {
+    locked.current = false;
+    setScanning(true);
+  };
 
   const onScanned = async ({ data }: { data: string }) => {
-    if (!scanning) return;
+    if (locked.current) return;
+    locked.current = true;
     setScanning(false);
     setLoading(true);
     try {
       const f = await lookupBarcode(data);
       if (!f) {
         Alert.alert('Not found', `No product for barcode ${data}.`, [
-          { text: 'Scan again', onPress: () => setScanning(true) },
+          { text: 'Scan again', onPress: resume },
         ]);
         return;
       }
@@ -34,7 +42,7 @@ export default function Scan() {
       if (f.servingSizeG) setGrams(String(f.servingSizeG));
     } catch {
       Alert.alert('Lookup failed', 'Could not reach the food database. Try again.', [
-        { text: 'OK', onPress: () => setScanning(true) },
+        { text: 'OK', onPress: resume },
       ]);
     } finally {
       setLoading(false);
@@ -78,7 +86,12 @@ export default function Scan() {
         <Text style={{ fontSize: 18, color: colors.text, marginBottom: space.md }}>
           Camera access is needed to scan barcodes.
         </Text>
-        <Button title="Grant camera access" onPress={requestPermission} />
+        {permission.canAskAgain ? (
+          <Button title="Grant camera access" onPress={requestPermission} />
+        ) : (
+          // Denied with "don't ask again": the OS won't prompt any more, only Settings can fix it.
+          <Button title="Open settings" onPress={() => Linking.openSettings()} />
+        )}
         <View style={{ height: space.sm }} />
         <Button title="Cancel" variant="secondary" onPress={() => router.back()} />
       </Screen>
@@ -111,7 +124,7 @@ export default function Scan() {
               variant="secondary"
               onPress={() => {
                 setFood(null);
-                setScanning(true);
+                resume();
               }}
             />
           </Card>

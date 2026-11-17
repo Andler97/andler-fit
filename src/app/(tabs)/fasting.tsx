@@ -3,9 +3,16 @@ import { Alert, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 're
 import { Button, Card, Pill, Screen } from '@/components/kit';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth';
-import { scheduleFastingNotifications } from '@/lib/notifications';
+import { parseHHMM, scheduleFastingNotifications, type ScheduleResult } from '@/lib/notifications';
 import type { FastingProtocol, FastingSettings } from '@/types/db';
 import { colors, space } from '@/lib/theme';
+
+const SAVED_MESSAGE: Record<ScheduleResult, string> = {
+  scheduled: 'Fasting reminders scheduled.',
+  disabled: 'Fasting reminders turned off.',
+  denied: 'Settings saved, but notifications are blocked. Allow them for andler-fit in system settings to get reminders.',
+  unsupported: 'Settings saved. Reminders only work in the mobile app.',
+};
 
 const PROTOCOLS: { key: FastingProtocol; label: string; minutes: number }[] = [
   { key: '16_8', label: '16:8', minutes: 8 * 60 },
@@ -46,13 +53,19 @@ export default function Fasting() {
   const save = async () => {
     const uid = session?.user.id;
     if (!uid) return;
+    const startTime = parseHHMM(start);
+    if (!startTime) {
+      Alert.alert('Check the time', 'Enter the eating window start as HH:MM, e.g. 12:00.');
+      return;
+    }
+    const pad = (n: number) => String(n).padStart(2, '0');
     const row: FastingSettings = {
       user_id: uid,
       enabled,
       protocol,
-      eating_window_start: start.length === 5 ? `${start}:00` : start,
+      eating_window_start: `${pad(startTime.hour)}:${pad(startTime.minute)}:00`,
       eating_window_minutes: windowMinutes,
-      timezone: 'Europe/Sofia',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
       notify_start: notifyStart,
       notify_end: notifyEnd,
     };
@@ -60,8 +73,8 @@ export default function Fasting() {
       setSaving(true);
       const { error } = await supabase.from('fasting_settings').upsert(row);
       if (error) throw error;
-      await scheduleFastingNotifications(row);
-      Alert.alert('Saved', enabled ? 'Fasting reminders scheduled.' : 'Fasting reminders turned off.');
+      const result = await scheduleFastingNotifications(row);
+      Alert.alert('Saved', SAVED_MESSAGE[result]);
     } catch (e: any) {
       Alert.alert('Could not save', e?.message ?? 'Please try again.');
     } finally {
