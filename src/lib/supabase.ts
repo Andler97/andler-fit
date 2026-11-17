@@ -1,4 +1,6 @@
 import 'react-native-url-polyfill/auto';
+// Before createClient: gives supabase-js a CSPRNG verifier and the S256 PKCE challenge on native.
+import '@/lib/webcrypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { AppState, Platform } from 'react-native';
