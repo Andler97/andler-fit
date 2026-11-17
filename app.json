@@ -42,7 +42,9 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "andler-fit scans product barcodes to look up nutrition."
+          "cameraPermission": "andler-fit scans product barcodes to look up nutrition.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
         }
       ],
       "expo-notifications",
@@ -53,6 +55,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "66b4f1cd-27d4-4606-a8b6-908246b7f837"
+      }
+    },
+    "owner": "andler97"
   }
 }
