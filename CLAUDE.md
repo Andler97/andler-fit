@@ -32,8 +32,8 @@ the owner, ask first. Re-read the board when planning; the snapshot below is fro
 
 **Goal → focus** (board scenario map): weight loss → calorie deficit + cardio/HIIT and isometric holds;
 muscle gain → calorie surplus + hypertrophy; fat cut → slight deficit + mix of hypertrophy, cardio/HIIT, isometrics.
-Note: the code's third goal is `recomp` at maintenance; the board calls it "recomp" (near-maintenance) in one
-place and "fat cut" (slight deficit) in another. Ask before changing the math.
+**Decided (owner, 2026-11-18):** the third goal is `recomp` at **maintenance** calories, as the code does. The
+board's "fat cut / slight deficit" wording doesn't change the math.
 
 **Andler Checklist (feature cards on the board)**: Sign-in (Apple ID / Google) + Resend emails on registration ·
 Goal + Edit Goal ("current and desired weight project the most fitting program") · Calorie tracker → barcode
@@ -50,8 +50,10 @@ exercise illustrations/animations. The current blue theme (`#208AEF`), app icon 
 template placeholders. Build UI on the tokens in `src/lib/theme.ts` so the palette can be swapped later, and
 don't introduce a visual direction of your own.
 
-**Open decisions (board, not blocking)**: auth method (email+password vs social vs magic link — the board's
-Architecture says "Auth (email)", the checklist and code use Google/Apple); default units metric (BG) vs imperial
+**Decided (owner, 2026-11-18):** sign-in is **Google + Apple only**, with no email/password or magic link,
+even though the board's Architecture frame says "Auth (email)" and Open decisions still lists it.
+
+**Open decisions (board, not blocking)**: default units metric (BG) vs imperial
 toggle; languages EN now, BG/RU via i18n; monetization (Stripe subscription, when); GDPR consent + data
 export/delete (health data); paid food-DB fallback if OFF coverage gaps show; who vets the exercise library.
 Board recommendations (stickies): metric default and i18n keys from day 1 so BG/RU drop in later; treat GDPR
@@ -63,7 +65,8 @@ export + delete as a P1 chore before any public launch.
 | Google sign-in | ✅ iPhone (Expo Go, S256 PKCE), ✅ web. Android dev build exists, never run on a device |
 | Apple sign-in | ⏸ wired, deferred (needs the ~$100/yr Apple Developer account; also unlocks App Store + iOS builds) |
 | Resend registration emails | ❌ not started |
-| Onboarding → targets | ✅ math matches DB; ran on web, not re-run on iPhone. ❌ protein override, ❌ working "Edit goal" |
+| Onboarding → targets | ✅ math matches DB; ran on web, not re-run on iPhone. ❌ protein override |
+| Edit goal | 🔧 `/edit-goal` modal, prefilled from profile + active goal + latest weigh-in (fixed 2026-11-18, not yet verified on iPhone) |
 | Scan → diary entry | ✅ iPhone (Expo Go). Client calls OFF directly; ❌ `off-lookup` edge fn / `foods` cache, ❌ search food |
 | Diary by meal | ⚠️ `meal_type` auto-set from time of day; no per-meal sections or picker |
 | Weight log + trend | ❌ table exists, no UI |
@@ -72,8 +75,6 @@ export + delete as a P1 chore before any public launch.
 | GDPR export/delete | ❌ not started |
 
 **Known issues**
-- "Edit goal" (Profile) pushes `/(onboarding)/goal`, but the redirect gate in `src/app/_layout.tsx` sends
-  onboarded users straight back to tabs, so the screen can't be reached. Onboarding also doesn't prefill.
 - Today: "Scan or add food" only scans; long-press deletes an entry with no confirmation.
 - Screen loads ignore Supabase `error`s (empty state instead of an error).
 - `app.json` has `userInterfaceStyle: automatic` but the theme is light-only; dark mode is untested.
@@ -120,7 +121,10 @@ npx eas-cli build --profile development --platform android   # cloud dev build (
 3. **Data access**: existing screens call `supabase` inline; for new features prefer `src/lib/<feature>.ts`
    and handle `error`.
 4. **Routes**: files under `src/app/`; tabs in `(tabs)/_layout.tsx`; modals registered in the root `Stack`
-   (`src/app/_layout.tsx`), which also holds the auth/onboarding redirect gate.
+   (`src/app/_layout.tsx`), which also holds the auth/onboarding redirect gate. The gate sends onboarded users
+   out of `(auth)`/`(onboarding)`, so screens for signed-in, onboarded users must live outside those groups
+   (that's why editing a goal is `src/app/edit-goal.tsx`, not the onboarding route). Typed routes
+   (`.expo/types`) regenerate only while Metro runs, so start it before `tsc` after adding a route.
 5. **UI**: compose from `src/components/kit.tsx` + `src/lib/theme.ts` tokens; no hard-coded colors.
 6. **Native modules**: `npx expo install <pkg>` only. A module that isn't in Expo Go needs a dev build,
    which is Android-only until there's an Apple Developer account, so iPhone testing would stop.
@@ -147,7 +151,8 @@ npx eas-cli build --profile development --platform android   # cloud dev build (
 - Migrations: `supabase/migrations/` (`0001_init_mvp`, `0002_harden_functions`). Apply in order.
 - Every user table has RLS: a row is visible/writable only to `auth.uid() = user_id` (profiles key on `id`). A trigger creates the `profiles` row on sign-up.
 - `foods`: public read of Open Food Facts cache rows; clients may only write their own `custom` foods. OFF cache writes go through a service-role Edge Function (`off-lookup`, not built yet), never the client. The app doesn't use `foods` yet (entries snapshot macros, `food_id` is null).
-- `food_log_entries.logged_on` is the **local** date (`todayLocalISO`); `weight_logs.logged_on` defaults to the UTC date, so set it from the client when building weight UI.
+- `food_log_entries.logged_on` is the **local** date (`todayLocalISO`); `weight_logs.logged_on` defaults to the UTC date, so always set it from the client (`saveGoal` does).
+- Goals keep history: saving retires the active row and inserts a new one (one active per user via a unique partial index), restoring the old row if the insert fails. `src/lib/goals.ts` owns this; onboarding and edit both go through it. A weigh-in is logged only when the weight changed.
 - Macro math lives in `src/lib/nutrition.ts` (Mifflin-St Jeor BMR × activity; lose/gain at 0.5 kg/week, recomp at maintenance; kcal floor 1500 male / 1200 otherwise; protein 1.8 / 2.2 / 2.0 g/kg for lose / gain / recomp).
 - After schema changes, run the Supabase security advisors and keep them at zero.
 
@@ -165,10 +170,10 @@ fasting_settings, fasting_logs, and stubs: exercises (training, P2), push_tokens
 
 ## Project layout
 ```
-src/app/            expo-router routes: (auth), (onboarding), (tabs), scan.tsx, _layout.tsx (redirect gate)
+src/app/            expo-router routes: (auth), (onboarding), (tabs), scan.tsx, edit-goal.tsx, _layout.tsx (redirect gate)
 src/providers/      auth.tsx (session + social sign-in)
-src/lib/            supabase, webcrypto, nutrition, openfoodfacts, notifications, dates, theme
-src/components/     kit.tsx (Screen/Button/Card/Pill)
+src/lib/            supabase, webcrypto, nutrition, goals, openfoodfacts, notifications, dates, theme
+src/components/     kit.tsx (Screen/Button/Card/Pill), goal-form.tsx (onboarding + edit goal)
 src/types/db.ts     hand-written row types
 supabase/migrations manifest + SQL
 docs/SETUP.md       run / OAuth / builds

@@ -37,6 +37,7 @@ function InitialLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="scan" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="edit-goal" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

@@ -51,7 +51,7 @@ export default function Profile() {
             </Text>
           ) : null}
           <Text> </Text>
-          <Button title="Edit goal" variant="secondary" onPress={() => router.push('/(onboarding)/goal')} />
+          <Button title="Edit goal" variant="secondary" onPress={() => router.push('/edit-goal')} />
         </Card>
         <Button title="Sign out" variant="danger" onPress={signOut} />
       </ScrollView>
