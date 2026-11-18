@@ -1,5 +1,9 @@
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
+**Project-specific guidance is in [CLAUDE.md](CLAUDE.md): read it first.** It covers the product vision
+(from the owner's Miro board), what's built, auth/native gotchas, and how to test on the owner's iPhone via
+Expo Go. Don't add features or design direction that aren't on the board.
+
 ## Expo has changed — do not trust your training data
 
 Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:
@@ -21,7 +25,7 @@ npx expo-doctor             # diagnose dependency and config issues
 npx expo install --fix      # fix incompatible package versions
 ```
 
-Run lint and typecheck before declaring any task done.
+Run the typecheck before declaring any task done. Lint isn't configured in this repo yet (no ESLint config).
 
 ## Navigation & Routing
 

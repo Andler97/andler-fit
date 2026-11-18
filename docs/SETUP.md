@@ -35,16 +35,10 @@ In the Supabase dashboard -> Authentication:
 
 Apple requires "Sign in with Apple" on iOS if any social login is offered (App Store rule) — already wired.
 
-## Push to GitHub (from your Windows machine, where git is signed in)
-1. Create an empty repo on github.com (e.g. `andler-fit`), with no README/.gitignore.
-2. In `C:\Andler\Andler-fit`:
-```bash
-git remote add origin https://github.com/<your-username>/andler-fit.git
-git push -u origin main
-```
+## GitHub
+Repo: https://github.com/Andler97/andler-fit (`origin`, branch `main`).
 
-## Roadmap after MVP
-- P2 — dynamic training: `exercises` library + AI program assembly/progression.
-- P3 — dietary quiz + healthy-tips push (needs `push_tokens` + an Expo push sender).
-- P4 — health-scoped chatbot.
-- `off-lookup` edge function for server-side Open Food Facts caching into `foods`.
+## Roadmap
+The product roadmap lives on the Miro board: https://miro.com/app/board/uXjVENT3fPY=/
+(P1 MVP: onboarding, tracker + scanner, fasting · P2 training · P3 dietary quiz + tips push · P4 chatbot).
+CLAUDE.md has a dated snapshot plus what's built vs. not.
