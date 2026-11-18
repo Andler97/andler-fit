@@ -66,7 +66,7 @@ export + delete as a P1 chore before any public launch.
 | Apple sign-in | ⏸ wired, deferred (needs the ~$100/yr Apple Developer account; also unlocks App Store + iOS builds) |
 | Resend registration emails | ❌ not started |
 | Onboarding → targets | ✅ math matches DB; ran on web, not re-run on iPhone. ❌ protein override |
-| Edit goal | 🔧 `/edit-goal` modal, prefilled from profile + active goal + latest weigh-in (fixed 2026-11-18, not yet verified on iPhone) |
+| Edit goal | ✅ iPhone (Expo Go): `/edit-goal` modal prefills from profile + active goal + latest weigh-in; saves keep goal history and `onboarded_at`. Weigh-in-on-weight-change not yet exercised |
 | Scan → diary entry | ✅ iPhone (Expo Go). Client calls OFF directly; ❌ `off-lookup` edge fn / `foods` cache, ❌ search food |
 | Diary by meal | ⚠️ `meal_type` auto-set from time of day; no per-meal sections or picker |
 | Weight log + trend | ❌ table exists, no UI |
