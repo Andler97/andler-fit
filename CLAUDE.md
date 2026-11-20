@@ -185,3 +185,24 @@ Other Supabase projects on this account (`imiu-map`, `motorcycle-joyride`) and t
 
 ## Commits
 Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`). Keep messages specific.
+
+## Food search (hybrid: USDA + Open Food Facts)
+Edge function `supabase/functions/food-search/index.ts` (deployed, JWT-required). Call it with
+`supabase.functions.invoke('food-search', { body })`:
+- `{ q: 'egg' }` -> USDA FoodData Central (clean generic/whole foods). **Default text search.**
+- `{ q: 'nutella', source: 'off' }` -> Open Food Facts text search (packaged-foods toggle).
+- `{ barcode: '3017620422003' }` -> Open Food Facts product (scanner path).
+
+Returns `{ items: Item[] }` where each item is normalized:
+`{ source, externalId, foodId, name, brand, verified, per100g:{kcal,protein,carbs,fat,sugars,fiber,satFat,salt}, servingSizeG, portions:[{label,grams}], imageUrl }`.
+`foodId` is a stable `foods` row (the function upserts USDA/OFF results via service role) — use it for logging and favorites.
+
+Client rules:
+- **Submit-only + debounced** search (OFF text is ~10 req/min; don't query per keystroke). Search on keyboard submit.
+- Compute logged macros client-side: `per100g * grams / 100`. Store the chosen portion label in `food_log_entries.serving_label`.
+- USDA key: set `USDA_FDC_API_KEY` as an edge-function secret (defaults to rate-limited DEMO_KEY).
+
+## Data model additions (0003)
+- `foods.portions` jsonb (named portions), unique `(source, external_id)` for upserts.
+- `food_favorites(user_id, food_id)` with RLS.
+- `food_log_entries.serving_label`.
